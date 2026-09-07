@@ -1,0 +1,12 @@
+/* Cleaned out default Vite styles to allow true full screen */
+:root {
+  /* Default variables if any */
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
