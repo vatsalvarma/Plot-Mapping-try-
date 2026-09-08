@@ -1,8 +1,9 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrthographicCamera, OrbitControls, Html, Sky, Environment, ContactShadows } from '@react-three/drei';
+import { OrthographicCamera, OrbitControls, Html, Sky, Environment, ContactShadows, Clouds, Cloud } from '@react-three/drei';
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import * as THREE from 'three';
+import type { BuildingData } from '../App';
 
 // Procedurally generate a window grid texture for realism
 const generateWindowTexture = () => {
@@ -44,44 +45,60 @@ const generateWindowTexture = () => {
 };
 
 // A highly realistic glass skyscraper
-const GlassBuilding = ({ position, scale, windowTex }: { position: [number, number, number], scale: [number, number, number], windowTex: THREE.Texture }) => {
+const GlassBuilding = ({ data, windowTex, onSelect, onHover, isHovered }: any) => {
   
   // Clone the texture so we can repeat it based on the building's specific scale
   const buildingTex = useMemo(() => {
     const tex = windowTex.clone();
     tex.needsUpdate = true;
     // Repeat based on width/height so windows are proportionally sized
-    tex.repeat.set(scale[0], scale[1]);
+    tex.repeat.set(data.scale[0], data.scale[1]);
     return tex;
-  }, [windowTex, scale]);
+  }, [windowTex, data.scale]);
 
   return (
-    <group position={position}>
+    <group position={data.position}>
       {/* Grass/Concrete Base */}
-      <mesh position={[0, -scale[1]/2 + 0.1, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[scale[0] + 1, scale[2] + 1]} />
+      <mesh position={[0, -data.scale[1]/2 + 0.1, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[data.scale[0] + 1, data.scale[2] + 1]} />
         <meshStandardMaterial color="#3f4a3c" roughness={1} />
       </mesh>
       
       {/* Reflective Glass Skyscraper Mesh */}
-      <mesh castShadow receiveShadow>
-        <boxGeometry args={scale} />
+      <mesh 
+        castShadow receiveShadow
+        onClick={(e) => { e.stopPropagation(); onSelect(data); }}
+        onPointerOver={(e) => { e.stopPropagation(); onHover(data.id); document.body.style.cursor = 'pointer'; }}
+        onPointerOut={(e) => { e.stopPropagation(); onHover(null); document.body.style.cursor = 'auto'; }}
+      >
+        <boxGeometry args={data.scale} />
         <meshPhysicalMaterial 
           map={buildingTex}
-          color="#a8b2c1" // Tint of the glass
-          metalness={0.95} // Highly reflective
-          roughness={0.05} // Very smooth glass
-          envMapIntensity={2.5} // Reflect the sky and environment strongly
-          clearcoat={1.0} // Extra layer of shine
+          color={isHovered ? "#d8e2f1" : "#a8b2c1"} 
+          emissive={isHovered ? "#1a2235" : "#000000"}
+          metalness={0.95} 
+          roughness={isHovered ? 0.02 : 0.05} 
+          envMapIntensity={2.5} 
+          clearcoat={1.0} 
           clearcoatRoughness={0.05}
         />
       </mesh>
       
       {/* Flat roof top (concrete) */}
-      <mesh position={[0, scale[1]/2 + 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[scale[0] - 0.1, scale[2] - 0.1]} />
+      <mesh position={[0, data.scale[1]/2 + 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[data.scale[0] - 0.1, data.scale[2] - 0.1]} />
         <meshStandardMaterial color="#64748b" roughness={0.9} metalness={0.1} />
       </mesh>
+
+      {/* Hover Tooltip */}
+      {isHovered && (
+        <Html position={[0, data.scale[1]/2 + 1.5, 0]} center className="ui-interactive" zIndexRange={[100, 0]}>
+          <div style={{ background: 'rgba(10, 11, 14, 0.9)', border: '1px solid var(--border-active)', padding: '8px 12px', color: '#fff', fontSize: '0.85rem', whiteSpace: 'nowrap', borderRadius: '6px', boxShadow: '0 4px 20px rgba(0,0,0,0.8)' }}>
+            <div className={`status-dot ${data.signal === 'WEAK' ? 'status-inactive' : 'status-active'}`} style={{ display: 'inline-block', marginRight: '8px' }} />
+            <strong style={{ letterSpacing: '1px' }}>{data.name}</strong>
+          </div>
+        </Html>
+      )}
     </group>
   );
 };
@@ -174,22 +191,163 @@ const generateRoadTexture = () => {
   return texture;
 };
 
+// Physical Glowing Sun
+export const GlowingSun = () => {
+  return (
+    <mesh position={[150, 15, -100]}>
+      <sphereGeometry args={[12, 32, 32]} />
+      {/* High color values combined with Bloom create a cinematic lens flare effect */}
+      <meshBasicMaterial color="#ffccaa" toneMapped={false} />
+    </mesh>
+  );
+};
+
+// Animated Volumetric Clouds
+export const MovingClouds = () => {
+  const cloudsRef = useRef<THREE.Group>(null);
+  
+  useFrame((_, delta) => {
+    if (!cloudsRef.current) return;
+    // Slowly rotate the entire cloud system across the sky for a realistic, seamless drift
+    cloudsRef.current.rotation.y += 0.02 * delta;
+  });
+
+  return (
+    <group ref={cloudsRef}>
+      <Clouds material={THREE.MeshLambertMaterial} limit={1000}>
+        {/* Core Clouds */}
+        <Cloud position={[100, 80, -50]} segments={40} bounds={[30, 5, 30]} volume={25} color="#ffebd6" />
+        <Cloud position={[-100, 70, -100]} segments={30} bounds={[20, 5, 20]} volume={15} color="#ffcbd6" />
+        <Cloud position={[50, 90, 100]} segments={40} bounds={[30, 8, 30]} volume={25} color="#ffffff" />
+        <Cloud position={[-50, 80, 50]} segments={20} bounds={[15, 5, 15]} volume={10} color="#ffeaa6" />
+        <Cloud position={[150, 85, 150]} segments={30} bounds={[25, 5, 25]} volume={20} color="#ffffff" />
+        <Cloud position={[-150, 90, 150]} segments={40} bounds={[35, 8, 35]} volume={25} color="#ffffff" />
+        <Cloud position={[0, 100, -150]} segments={30} bounds={[20, 5, 20]} volume={15} color="#ffebd6" />
+        
+        {/* Additional Fill Clouds */}
+        <Cloud position={[200, 75, 0]} segments={35} bounds={[25, 6, 25]} volume={20} color="#ffcbd6" />
+        <Cloud position={[-200, 85, 0]} segments={45} bounds={[35, 10, 35]} volume={30} color="#ffffff" />
+        <Cloud position={[120, 110, -180]} segments={25} bounds={[20, 5, 20]} volume={15} color="#ffeaa6" />
+        <Cloud position={[-180, 75, -50]} segments={35} bounds={[30, 7, 30]} volume={25} color="#ffebd6" />
+        <Cloud position={[0, 80, 180]} segments={40} bounds={[25, 6, 25]} volume={20} color="#ffffff" />
+        <Cloud position={[80, 65, 200]} segments={20} bounds={[15, 4, 15]} volume={12} color="#ffebd6" />
+        <Cloud position={[-80, 95, 220]} segments={30} bounds={[25, 5, 25]} volume={18} color="#ffcbd6" />
+        <Cloud position={[220, 105, 80]} segments={40} bounds={[35, 8, 35]} volume={25} color="#ffffff" />
+        <Cloud position={[-220, 85, -120]} segments={25} bounds={[18, 5, 18]} volume={15} color="#ffebd6" />
+        <Cloud position={[40, 115, -220]} segments={35} bounds={[28, 6, 28]} volume={22} color="#ffffff" />
+        <Cloud position={[-40, 70, -250]} segments={20} bounds={[15, 4, 15]} volume={10} color="#ffeaa6" />
+      </Clouds>
+    </group>
+  );
+};
+
+// Flapping Birds
+export const FlappingBird = ({ startPos, speed, offset }: { startPos: [number, number, number], speed: number, offset: number }) => {
+  const ref = useRef<THREE.Group>(null);
+  
+  useFrame((state, delta) => {
+    if (!ref.current) return;
+    ref.current.position.x -= speed * delta;
+    // Slight bobbing
+    ref.current.position.y += Math.sin(state.clock.elapsedTime * 2 + offset) * 0.02;
+    if (ref.current.position.x < -200) ref.current.position.x = 200;
+    
+    // Flapping wings
+    const flap = Math.sin(state.clock.elapsedTime * 15 + offset);
+    (ref.current.children[0] as any).rotation.z = flap * 0.6;
+    (ref.current.children[1] as any).rotation.z = -flap * 0.6;
+  });
+  
+  return (
+    <group ref={ref} position={startPos}>
+       <mesh position={[0, 0, 0.3]}>
+         <boxGeometry args={[0.6, 0.05, 0.5]} />
+         <meshBasicMaterial color="#111" />
+       </mesh>
+       <mesh position={[0, 0, -0.3]}>
+         <boxGeometry args={[0.6, 0.05, 0.5]} />
+         <meshBasicMaterial color="#111" />
+       </mesh>
+    </group>
+  );
+};
+
 // Tree Component
-const Tree = ({ position }: { position: [number, number, number] }) => {
-  const height = Math.random() * 2 + 3;
-  const leafColor = ['#2d4c1e', '#3a5f27', '#4b7a33', '#5c923e'][Math.floor(Math.random() * 4)];
+export const Tree = ({ position }: { position: [number, number, number] }) => {
+  const isPine = useRef(Math.random() > 0.5).current;
+  const height = useRef(Math.random() * 3 + 4).current;
+  const leafColor = useRef(['#2d4c1e', '#3a5f27', '#4b7a33', '#1e3814'][Math.floor(Math.random() * 4)]).current;
+  
+  const phase = useRef(Math.random() * Math.PI * 2).current;
+  const canopyRef = useRef<THREE.Group>(null);
+  
+  useFrame((state) => {
+    if (canopyRef.current) {
+      const t = state.clock.elapsedTime + phase;
+      canopyRef.current.rotation.z = Math.sin(t * 1.5) * 0.04; // Wind swaying
+      canopyRef.current.rotation.x = Math.cos(t * 1.0) * 0.04;
+    }
+  });
+
+  if (isPine) {
+    return (
+      <group position={position}>
+        {/* Trunk */}
+        <mesh castShadow receiveShadow position={[0, height / 2, 0]}>
+          <cylinderGeometry args={[0.2, 0.4, height, 5]} />
+          <meshStandardMaterial color="#3a2f25" roughness={0.9} />
+        </mesh>
+        {/* Pine Layers (Pivots from middle) */}
+        <group ref={canopyRef} position={[0, height * 0.4, 0]}>
+          <mesh castShadow receiveShadow position={[0, height * 0.1, 0]}>
+            <coneGeometry args={[1.8, height * 0.6, 7]} />
+            <meshStandardMaterial color={leafColor} roughness={0.8} />
+          </mesh>
+          <mesh castShadow receiveShadow position={[0, height * 0.35, 0]}>
+            <coneGeometry args={[1.4, height * 0.5, 7]} />
+            <meshStandardMaterial color={leafColor} roughness={0.8} />
+          </mesh>
+          <mesh castShadow receiveShadow position={[0, height * 0.55, 0]}>
+            <coneGeometry args={[0.9, height * 0.4, 7]} />
+            <meshStandardMaterial color={leafColor} roughness={0.8} />
+          </mesh>
+        </group>
+      </group>
+    );
+  }
+
+  // Oak / Deciduous
   return (
     <group position={position}>
-      {/* Trunk */}
+      {/* Thick Trunk */}
       <mesh castShadow receiveShadow position={[0, height / 2, 0]}>
-        <cylinderGeometry args={[0.2, 0.3, height, 8]} />
-        <meshStandardMaterial color="#4a3b2c" roughness={1} />
+        <cylinderGeometry args={[0.3, 0.6, height, 6]} />
+        <meshStandardMaterial color="#4a3b2c" roughness={0.9} />
       </mesh>
-      {/* Leaves */}
-      <mesh castShadow receiveShadow position={[0, height, 0]}>
-        <icosahedronGeometry args={[1.5, 1]} />
-        <meshStandardMaterial color={leafColor} roughness={0.8} />
-      </mesh>
+      
+      {/* Organic Canopy (Pivots from top of trunk) */}
+      <group ref={canopyRef} position={[0, height, 0]}>
+        <mesh castShadow receiveShadow position={[0, 0, 0]}>
+          <dodecahedronGeometry args={[1.8, 1]} />
+          <meshStandardMaterial color={leafColor} roughness={0.8} />
+        </mesh>
+        <mesh castShadow receiveShadow position={[1.2, -0.3, 0.5]}>
+          <dodecahedronGeometry args={[1.4, 1]} />
+          <meshStandardMaterial color={leafColor} roughness={0.8} />
+        </mesh>
+        <mesh castShadow receiveShadow position={[-1.2, -0.4, -0.4]}>
+          <dodecahedronGeometry args={[1.5, 1]} />
+          <meshStandardMaterial color={leafColor} roughness={0.8} />
+        </mesh>
+        <mesh castShadow receiveShadow position={[0.3, 0.6, -1.0]}>
+          <dodecahedronGeometry args={[1.3, 1]} />
+          <meshStandardMaterial color={leafColor} roughness={0.8} />
+        </mesh>
+        <mesh castShadow receiveShadow position={[-0.4, 0.8, 0.8]}>
+          <dodecahedronGeometry args={[1.2, 1]} />
+          <meshStandardMaterial color={leafColor} roughness={0.8} />
+        </mesh>
+      </group>
     </group>
   );
 };
@@ -408,15 +566,17 @@ const DroneMarker = ({ position, label, active = false }: { position: [number, n
   );
 };
 
-export const CityMap: React.FC = () => {
+export const CityMap: React.FC<{ onSelectBuilding: (b: BuildingData) => void }> = ({ onSelectBuilding }) => {
   // Generate the window texture once for all buildings to use
   const windowTexture = useMemo(() => generateWindowTexture(), []);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   // Generate dynamic traffic, pedestrians, and trees
   const traffic = useMemo(() => {
     const cars = [];
     const npcs = [];
     const trees = [];
+    const birds = [];
     const carColors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#ffffff', '#111827', '#6b7280'];
     
     // Spawn cars on roads (roads are at multiples of 18)
@@ -464,7 +624,16 @@ export const CityMap: React.FC = () => {
       }
     }
 
-    return { cars, npcs, trees };
+    // Generate Birds in the sky
+    for (let i = 0; i < 30; i++) {
+      birds.push({
+        startPos: [Math.random() * 400 - 200, Math.random() * 15 + 35, Math.random() * 400 - 200] as [number, number, number],
+        speed: Math.random() * 15 + 10,
+        offset: Math.random() * 10
+      });
+    }
+
+    return { cars, npcs, trees, birds };
   }, []);
 
   const buildings = useMemo(() => {
@@ -491,6 +660,12 @@ export const CityMap: React.FC = () => {
         const d = (Math.random() * 3) + 2.5;
         
         blocks.push({
+          id: `BLDG-${Math.floor(Math.random() * 10000)}`,
+          name: ['AEC', 'BAS', 'ICD', 'MME', 'ZEX'][Math.floor(Math.random() * 5)] + `-${Math.floor(Math.random() * 1000 + 1000)}-NYC`,
+          power: Math.floor(Math.random() * 40) + 60,
+          session: `${Math.floor(Math.random() * 12) + 1}HR ${Math.floor(Math.random() * 60)}MIN`,
+          signal: ['STRONG', 'MODERATE', 'WEAK'][Math.floor(Math.random() * 3)],
+          health: Math.floor(Math.random() * 30) + 70,
           position: [x, height / 2, z] as [number, number, number],
           scale: [w, height, d] as [number, number, number]
         });
@@ -507,8 +682,11 @@ export const CityMap: React.FC = () => {
       gl={{ antialias: false, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.2 }}
     >
       {/* Golden Hour / Sunset Lighting for extreme realism */}
-      <Sky sunPosition={[100, 5, -50]} turbidity={0.6} rayleigh={1.5} mieCoefficient={0.005} mieDirectionalG={0.8} />
+      <Sky sunPosition={[150, 15, -100]} turbidity={0.7} rayleigh={2} mieCoefficient={0.005} mieDirectionalG={0.8} />
       <Environment preset="sunset" background={false} />
+      
+      <GlowingSun />
+      <MovingClouds />
       
       <OrthographicCamera 
         makeDefault 
@@ -525,12 +703,14 @@ export const CityMap: React.FC = () => {
         maxPolarAngle={Math.PI / 2 - 0.05}
         minPolarAngle={Math.PI / 8}
         target={[0, 0, 0]}
+        autoRotate={true}
+        autoRotateSpeed={0.5}
       />
 
       <ambientLight intensity={0.2} color="#404040" />
       <directionalLight 
-        position={[100, 20, -50]} 
-        intensity={4} 
+        position={[150, 20, -100]} 
+        intensity={5} 
         color="#ffebd6"
         castShadow 
         shadow-mapSize={[4096, 4096]} 
@@ -544,6 +724,11 @@ export const CityMap: React.FC = () => {
       <directionalLight position={[-50, 50, 50]} intensity={0.5} color="#87ceeb" />
 
       <Ground />
+
+      {/* Render Birds */}
+      {traffic.birds.map((bird: any, i: number) => (
+        <FlappingBird key={`bird-${i}`} startPos={bird.startPos} speed={bird.speed} offset={bird.offset} />
+      ))}
 
       {/* Render Trees */}
       {traffic.trees.map((t: any, i: number) => (
@@ -560,8 +745,15 @@ export const CityMap: React.FC = () => {
         <NPC key={`npc-${i}`} {...npc} />
       ))}
 
-      {buildings.map((b: any, i: number) => (
-        <GlassBuilding key={i} position={b.position} scale={b.scale} windowTex={windowTexture} />
+      {buildings.map((b: any) => (
+        <GlassBuilding 
+          key={b.id} 
+          data={b} 
+          windowTex={windowTexture} 
+          onSelect={onSelectBuilding}
+          onHover={setHoveredId}
+          isHovered={hoveredId === b.id}
+        />
       ))}
 
       <DroneMarker position={[0, 45, 0]} label="AEC-4200-NYC" active={true} />

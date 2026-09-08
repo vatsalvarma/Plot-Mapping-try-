@@ -1,6 +1,11 @@
 import React from 'react';
+import type { BuildingData, ViewMode } from '../App';
 
-export const HUD: React.FC = () => {
+export const HUD: React.FC<{ 
+  selectedBuilding: BuildingData | null;
+  activeView: ViewMode;
+  setActiveView: (v: ViewMode) => void;
+}> = ({ selectedBuilding, activeView, setActiveView }) => {
   return (
     <div className="ui-layer">
       
@@ -13,9 +18,9 @@ export const HUD: React.FC = () => {
         </div>
         
         <div className="nav-links">
-          <div className="nav-link">BRIEF</div>
-          <div className="nav-link active">UNIT MAP</div>
-          <div className="nav-link">SETUP</div>
+          <div className={`nav-link ${activeView === 'PLOT_MODEL' ? 'active' : ''}`} onClick={() => setActiveView('PLOT_MODEL')}>PLOT MODEL</div>
+          <div className={`nav-link ${activeView === 'CITY' ? 'active' : ''}`} onClick={() => setActiveView('CITY')}>UNIT MAP</div>
+          <div className={`nav-link ${activeView === 'PLOTS' ? 'active' : ''}`} onClick={() => setActiveView('PLOTS')}>OPEN PLOTS</div>
         </div>
 
         <div style={{ display: 'flex', gap: '2rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
@@ -45,9 +50,10 @@ export const HUD: React.FC = () => {
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.5 }}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       </div>
 
-      {/* Drone Details Card */}
-      <div className="drone-card ui-interactive">
-        <div className="drone-card-inner">
+      {/* Drone Details Card (Only in City Mode) */}
+      {activeView === 'CITY' && (
+        <div className="drone-card ui-interactive">
+          <div className="drone-card-inner">
            <div className="drone-image-box">
               {/* Drone Wireframe Icon */}
               <svg width="120" height="80" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
@@ -56,41 +62,52 @@ export const HUD: React.FC = () => {
               <button className="drone-details-btn">Details ↗</button>
            </div>
            
-           <div className="drone-title">
-             <div className="status-dot status-active" />
-             <span style={{ fontSize: '0.8rem', color: 'var(--accent-green)' }}>ACTIVE</span>
-             AEC-4200-NYC
-           </div>
-
-           <div className="stat-row">
-             <span className="stat-label">Power</span>
-             <span>80% ||||||||--</span>
-           </div>
-           <div className="stat-row">
-             <span className="stat-label">Session</span>
-             <span>3HR 20MIN</span>
-           </div>
-           <div className="stat-row">
-             <span className="stat-label">Signal</span>
-             <span style={{ color: 'var(--accent-orange)' }}>MODERATE <div className="status-dot" style={{ display: 'inline-block', background: 'var(--accent-orange)' }}/></span>
-           </div>
-
-           <div style={{ display: 'flex', border: '1px solid var(--border-light)', marginTop: '1.5rem' }}>
-             <div style={{ flex: 1, textAlign: 'center', padding: '0.5rem', background: 'rgba(255,255,255,0.1)' }}>PERFORMANCE</div>
-             <div style={{ flex: 1, textAlign: 'center', padding: '0.5rem', color: 'var(--text-muted)' }}>HEALTH</div>
-           </div>
-
-           <div className="progress-bar-container">
-             <div className="progress-bars">
-                {[...Array(20)].map((_, i) => (
-                  <div key={i} className={`bar-segment ${i < 12 ? 'filled' : ''}`} />
-                ))}
-                <span style={{ marginLeft: '1rem', fontSize: '1.2rem' }}>62%</span>
+           {!selectedBuilding ? (
+             <div style={{ textAlign: 'center', color: 'var(--text-muted)', margin: '3rem 0', fontStyle: 'italic' }}>
+               Select a building on the 3D map to view live structural and surveillance details.
              </div>
-             <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>PREPARING PERFORMANCE DETAILS...</div>
-           </div>
+           ) : (
+             <>
+               <div className="drone-title">
+                 <div className={`status-dot ${selectedBuilding.signal === 'WEAK' ? 'status-inactive' : 'status-active'}`} />
+                 <span style={{ fontSize: '0.8rem', color: selectedBuilding.signal === 'WEAK' ? 'var(--accent-orange)' : 'var(--accent-green)' }}>ACTIVE</span>
+                 {selectedBuilding.name}
+               </div>
+
+               <div className="stat-row">
+                 <span className="stat-label">Power</span>
+                 <span>{selectedBuilding.power}% {Array.from({length: 10}).map((_, i) => i < selectedBuilding.power / 10 ? '|' : '-').join('')}</span>
+               </div>
+               <div className="stat-row">
+                 <span className="stat-label">Session</span>
+                 <span>{selectedBuilding.session}</span>
+               </div>
+               <div className="stat-row">
+                 <span className="stat-label">Signal</span>
+                 <span style={{ color: selectedBuilding.signal === 'STRONG' ? 'var(--accent-green)' : 'var(--accent-orange)' }}>
+                   {selectedBuilding.signal} <div className="status-dot" style={{ display: 'inline-block', background: selectedBuilding.signal === 'STRONG' ? 'var(--accent-green)' : 'var(--accent-orange)' }}/>
+                 </span>
+               </div>
+
+               <div style={{ display: 'flex', border: '1px solid var(--border-light)', marginTop: '1.5rem' }}>
+                 <div style={{ flex: 1, textAlign: 'center', padding: '0.5rem', background: 'rgba(255,255,255,0.1)' }}>PERFORMANCE</div>
+                 <div style={{ flex: 1, textAlign: 'center', padding: '0.5rem', color: 'var(--text-muted)' }}>HEALTH</div>
+               </div>
+
+               <div className="progress-bar-container">
+                 <div className="progress-bars">
+                    {[...Array(20)].map((_, i) => (
+                      <div key={i} className={`bar-segment ${i < (selectedBuilding.health / 5) ? 'filled' : ''}`} />
+                    ))}
+                    <span style={{ marginLeft: '1rem', fontSize: '1.2rem' }}>{selectedBuilding.health}%</span>
+                 </div>
+                 <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>LIVE STRUCTURAL INTEGRITY DETAILS...</div>
+               </div>
+             </>
+           )}
         </div>
       </div>
+      )}
 
       {/* Bottom Unit List */}
       <div className="bottom-bar ui-interactive" style={{ left: '60px' }}>
