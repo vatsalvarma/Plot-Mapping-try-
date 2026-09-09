@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
+import { motion, AnimatePresence } from 'framer-motion';
 import { OrthographicCamera, OrbitControls, Sky, Environment, MeshReflectorMaterial, SoftShadows, Stars, Line, Html } from '@react-three/drei';
 import { Delaunay } from 'd3-delaunay';
 import { useState } from 'react';
@@ -392,21 +393,322 @@ const ProceduralPlotLines = ({ voronoiData }: { voronoiData: any }) => {
   );
 };
 
+// Double-Click 3D Highlight with Clipped Scanner Rings
+const SelectedPlotHighlight = ({ plot }: { plot: any }) => {
+  const polygon = plot.polygon;
+  const lineGeometry = useMemo(() => {
+    const points: number[] = [];
+    for (let i = 0; i < polygon.length - 1; i++) {
+      const p1x = polygon[i][0];
+      const p1z = polygon[i][1];
+      const p2x = polygon[i+1][0];
+      const p2z = polygon[i+1][1];
+      
+      const steps = 10;
+      for(let j=0; j<steps; j++) {
+         const t1 = j/steps;
+         const t2 = (j+1)/steps;
+         const xA = p1x + (p2x - p1x) * t1;
+         const zA = p1z + (p2z - p1z) * t1;
+         const xB = p1x + (p2x - p1x) * t2;
+         const zB = p1z + (p2z - p1z) * t2;
+         
+         points.push(xA, getTerrainHeight(xA, zA) + 0.4, zA);
+         points.push(xB, getTerrainHeight(xB, zB) + 0.4, zB);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+    return geo;
+  }, [polygon]);
+
+  // Create a 2D Shape from the polygon for the Stencil Mask
+  const plotShape = useMemo(() => {
+    const shape = new THREE.Shape();
+    if (polygon.length > 0) {
+      // Local coordinate space relative to plot center
+      // NOTE: Shape is in XY plane. When rotated -90 deg on X, Shape's Y becomes -Z in 3D.
+      // So we must pass Y = -(Z) to the shape.
+      shape.moveTo(polygon[0][0] - plot.x, -(polygon[0][1] - plot.z));
+      for (let i = 1; i < polygon.length; i++) {
+         shape.lineTo(polygon[i][0] - plot.x, -(polygon[i][1] - plot.z));
+      }
+    }
+    return shape;
+  }, [polygon, plot]);
+
+  const radius = useMemo(() => {
+     let maxSq = 0;
+     polygon.forEach((p: [number, number]) => {
+        const dx = p[0] - plot.x;
+        const dz = p[1] - plot.z;
+        const distSq = dx*dx + dz*dz;
+        if(distSq > maxSq) maxSq = distSq;
+     });
+     return Math.sqrt(maxSq);
+  }, [polygon, plot]);
+
+  const ringsRef = useRef<any>(null);
+  
+  useFrame((state) => {
+    if (ringsRef.current) {
+      const t = state.clock.elapsedTime;
+      ringsRef.current.children.forEach((child: any, i: number) => {
+         const scale = ((t * 0.5 + i * 0.33) % 1.0); // 0 to 1
+         child.scale.set(scale * radius, scale * radius, 1);
+         child.material.opacity = (1.0 - scale) * 0.8; // Fade out as it expands
+      });
+    }
+  });
+
+  return (
+    <group>
+      <lineSegments geometry={lineGeometry}>
+        <lineBasicMaterial color="#00ffff" linewidth={4} opacity={1} transparent depthTest={false} />
+      </lineSegments>
+      
+      {/* Invisible Stencil Mask for clipping */}
+      <mesh position={[plot.x, plot.y + 0.5, plot.z]} rotation={[-Math.PI/2, 0, 0]} renderOrder={1}>
+         <shapeGeometry args={[plotShape]} />
+         <meshBasicMaterial 
+            colorWrite={false} 
+            depthWrite={false} 
+            depthTest={false}
+            stencilWrite={true}
+            stencilRef={1}
+            stencilFunc={THREE.AlwaysStencilFunc}
+            stencilZPass={THREE.ReplaceStencilOp}
+         />
+      </mesh>
+
+      {/* Clipped Scanner Rings */}
+      <group ref={ringsRef} position={[plot.x, plot.y + 0.5, plot.z]} rotation={[-Math.PI/2, 0, 0]}>
+        <mesh renderOrder={2}><ringGeometry args={[0.9, 1.0, 64]} /><meshBasicMaterial color="#00ffff" transparent depthTest={false} blending={THREE.AdditiveBlending} stencilWrite={true} stencilRef={1} stencilFunc={THREE.EqualStencilFunc} /></mesh>
+        <mesh renderOrder={2}><ringGeometry args={[0.9, 1.0, 64]} /><meshBasicMaterial color="#00ffff" transparent depthTest={false} blending={THREE.AdditiveBlending} stencilWrite={true} stencilRef={1} stencilFunc={THREE.EqualStencilFunc} /></mesh>
+        <mesh renderOrder={2}><ringGeometry args={[0.9, 1.0, 64]} /><meshBasicMaterial color="#00ffff" transparent depthTest={false} blending={THREE.AdditiveBlending} stencilWrite={true} stencilRef={1} stencilFunc={THREE.EqualStencilFunc} /></mesh>
+      </group>
+    </group>
+  );
+};
+
+// Double-Click HTML Overlay Panel
+const PlotDetailsPanel = ({ plot, onClose }: { plot: any, onClose: () => void }) => {
+  const svgSize = 250;
+  const padding = 50;
+  
+  const { normalizedPoly, edgeLengths } = useMemo(() => {
+     let minX = Infinity, minZ = Infinity;
+     let maxX = -Infinity, maxZ = -Infinity;
+     
+     plot.polygon.forEach((p: [number, number]) => {
+        if (p[0] < minX) minX = p[0];
+        if (p[0] > maxX) maxX = p[0];
+        if (p[1] < minZ) minZ = p[1];
+        if (p[1] > maxZ) maxZ = p[1];
+     });
+     
+     const width = maxX - minX;
+     const height = maxZ - minZ;
+     const scale = (svgSize - padding * 2) / Math.max(width, height);
+     
+     const normalized = plot.polygon.map((p: [number, number]) => [
+        (p[0] - minX) * scale + padding,
+        (p[1] - minZ) * scale + padding
+     ]);
+     
+     const edges = [];
+     for(let i=0; i<plot.polygon.length - 1; i++) {
+        const dx = plot.polygon[i+1][0] - plot.polygon[i][0];
+        const dz = plot.polygon[i+1][1] - plot.polygon[i][1];
+        const len = Math.hypot(dx, dz);
+        
+        const midX = (normalized[i][0] + normalized[i+1][0]) / 2;
+        const midY = (normalized[i][1] + normalized[i+1][1]) / 2;
+        
+        const nDx = normalized[i+1][0] - normalized[i][0];
+        const nDy = normalized[i+1][1] - normalized[i][1];
+        const nLen = Math.hypot(nDx, nDy);
+        const nx = (-nDy / nLen);
+        const ny = (nDx / nLen);
+        
+        let dirStr = '';
+        if (Math.abs(nx) > Math.abs(ny)) {
+           dirStr = nx > 0 ? 'E' : 'W';
+        } else {
+           dirStr = ny > 0 ? 'S' : 'N';
+        }
+
+        edges.push({
+           len: len.toFixed(1) + 'ft',
+           labelX: midX + nx * 18,
+           labelY: midY + ny * 18,
+           dir: dirStr
+        });
+     }
+     return { normalizedPoly: normalized, edgeLengths: edges };
+  }, [plot]);
+  
+  const pointsString = normalizedPoly.map((p: [number, number]) => `${p[0]},${p[1]}`).join(' ');
+
+  const getStatusColor = (status: string) => {
+     if (status === 'AVAILABLE') return '#00ffcc';
+     if (status === 'BOOKED') return '#ffaa00';
+     return '#ff3366';
+  };
+
+  return (
+    <motion.div
+      initial={{ x: '120%', opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: '120%', opacity: 0 }}
+      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+      style={{
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        width: '380px',
+        height: '100vh',
+        boxSizing: 'border-box',
+        backgroundColor: 'rgba(5, 12, 18, 0.85)',
+        backdropFilter: 'blur(12px)',
+        borderLeft: '1px solid rgba(0, 255, 255, 0.2)',
+        boxShadow: '-10px 0 40px rgba(0, 255, 255, 0.1)',
+        zIndex: 2000,
+        padding: '20px 25px',
+        overflowY: 'hidden',
+        color: '#ffffff',
+        fontFamily: "'Space Mono', 'Courier New', monospace",
+        display: 'flex',
+        flexDirection: 'column'
+      }}
+    >
+       <button onClick={onClose} style={{ position: 'absolute', top: '15px', right: '20px', background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: '#00ffff' }}>×</button>
+
+       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+          <div style={{ 
+             padding: '2px 8px', borderRadius: '4px', border: `1px solid ${getStatusColor(plot.status)}`,
+             color: getStatusColor(plot.status), fontSize: '10px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px',
+             background: `${getStatusColor(plot.status)}22`
+          }}>
+             <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: getStatusColor(plot.status), boxShadow: `0 0 5px ${getStatusColor(plot.status)}` }} />
+             {plot.status}
+          </div>
+          <span style={{ color: '#00ffff', fontSize: '11px', letterSpacing: '1px' }}>O-PLOT #{plot.id}</span>
+       </div>
+
+       <h1 style={{ margin: '0 0 2px 0', fontSize: '24px', fontWeight: 'bold', textShadow: '0 0 10px rgba(255,255,255,0.3)' }}>SECTOR {plot.id} ZONING</h1>
+       <p style={{ color: '#88bbcc', margin: '0 0 15px 0', fontSize: '12px', letterSpacing: '1px' }}>COORDINATES: [{plot.x.toFixed(2)}, {plot.z.toFixed(2)}]</p>
+
+       <hr style={{ border: 'none', borderTop: '1px solid rgba(0, 255, 255, 0.2)', marginBottom: '15px' }} />
+
+       <div style={{ 
+           background: 'rgba(0, 20, 30, 0.6)', 
+           border: '1px solid rgba(0, 255, 255, 0.3)', 
+           borderRadius: '8px', 
+           padding: '10px', 
+           display: 'flex', 
+           justifyContent: 'center', 
+           alignItems: 'center' 
+       }}>
+          <svg width={svgSize} height={svgSize} style={{ overflow: 'visible' }}>
+             <polygon points={pointsString} fill="rgba(0, 255, 255, 0.05)" stroke="#00ffff" strokeWidth="2" strokeLinejoin="miter" />
+             {normalizedPoly.map((p: [number, number], i: number) => (
+                <circle key={i} cx={p[0]} cy={p[1]} r="3" fill="#ffffff" style={{ filter: 'drop-shadow(0 0 5px #00ffff)' }} />
+             ))}
+             {edgeLengths.map((edge: any, i: number) => (
+                <text key={i} x={edge.labelX} y={edge.labelY} fontSize="9" fontFamily="'Space Mono', monospace" fill="#88bbcc" textAnchor="middle" dominantBaseline="middle">
+                   {edge.dir} {edge.len}
+                </text>
+             ))}
+          </svg>
+       </div>
+
+       <div style={{ marginTop: '20px', fontSize: '11px', letterSpacing: '2px', color: '#88bbcc', textTransform: 'uppercase' }}>TOTAL SURVEYED AREA</div>
+       <div style={{ fontSize: '22px', margin: '2px 0 10px 0', color: '#00ffff', textShadow: '0 0 10px rgba(0, 255, 255, 0.4)' }}>
+          {plot.area.toLocaleString()} <span style={{ fontSize: '12px', color: '#88bbcc' }}>SQ.FT.</span>
+       </div>
+
+       {/* Description Block */}
+       <div style={{ marginTop: '10px', padding: '15px', background: 'rgba(0, 255, 255, 0.05)', borderLeft: '3px solid #00ffff', borderRadius: '0 8px 8px 0', fontSize: '12px', lineHeight: '1.6', color: '#aaddff' }}>
+          <strong>ZONING INTEL:</strong> This sector is designated for {plot.type.toLowerCase()} development. The terrain has been procedurally mapped and verified for structural integrity. Optimal sunlight exposure and proximity to main transit routes are confirmed.
+       </div>
+
+       <div style={{ marginTop: 'auto' }} /> {/* Pushes everything below this to the bottom */}
+
+       <button onClick={onClose} style={{ 
+           width: '100%', padding: '10px', 
+           background: 'rgba(0, 255, 255, 0.1)', 
+           color: '#00ffff', 
+           border: '1px solid #00ffff', 
+           borderRadius: '4px', 
+           fontSize: '13px', 
+           fontWeight: 'bold', 
+           letterSpacing: '2px',
+           marginTop: '25px', 
+           cursor: 'pointer',
+           transition: 'all 0.2s ease',
+       }}>
+          [ CLOSE SCANNER ]
+       </button>
+    </motion.div>
+  );
+};
+
+
 export const OpenPlotsMap: React.FC = () => {
   const [sunRef, setSunRef] = React.useState<THREE.Mesh | null>(null);
-  const [showPlotLines, setShowPlotLines] = useState(false);
-  const [selectedPlot, setSelectedPlot] = useState<any>(null);
+  const [showPlotLines, setShowPlotLines] = React.useState(false);
+  const [selectedPlot, setSelectedPlot] = React.useState<any>(null);
+  const [doubleClickedPlot, setDoubleClickedPlot] = React.useState<any>(null);
   
   const voronoiData = useMemo(() => {
     const seeds: [number, number][] = [];
+    const statusArray: string[] = [];
     for(let i=0; i<300; i++) {
        const tx = (Math.random() - 0.5) * 600;
        const tz = (Math.random() - 0.5) * 600;
        seeds.push([tx, tz]);
+       const rand = Math.random();
+       if (rand > 0.8) statusArray.push('SOLD');
+       else if (rand > 0.5) statusArray.push('BOOKED');
+       else statusArray.push('AVAILABLE');
     }
     const delaunay = Delaunay.from(seeds);
-    return { seeds, delaunay };
+    return { seeds, delaunay, statusArray };
   }, []);
+
+
+  const handleTerrainDoubleClick = (e: any) => {
+    if (!showPlotLines) return;
+    e.stopPropagation();
+    const { x, z } = e.point;
+    const index = voronoiData.delaunay.find(x, z);
+    const seed = voronoiData.seeds[index];
+    
+    const voronoi = voronoiData.delaunay.voronoi([-200, -200, 200, 200]);
+    const polygon = voronoi.cellPolygon(index);
+    if (!polygon) return;
+
+    let type = 'EMPTY PLOT';
+    let area = 0;
+    for (let i = 0; i < polygon.length - 1; i++) {
+       area += polygon[i][0] * polygon[i+1][1] - polygon[i+1][0] * polygon[i][1];
+    }
+    area = Math.abs(area / 2);
+    area = Math.round(area * 10);
+
+    const status = voronoiData.statusArray[index];
+    setDoubleClickedPlot({
+      id: index + 1000,
+      x: seed[0],
+      y: getTerrainHeight(seed[0], seed[1]),
+      z: seed[1],
+      polygon: Array.from(polygon),
+      area,
+      type,
+      status
+    });
+  };
 
   const handleTerrainClick = (e: any) => {
     if (!showPlotLines) return;
@@ -566,12 +868,13 @@ export const OpenPlotsMap: React.FC = () => {
       />
       <directionalLight position={[-50, 50, 50]} intensity={0.5} color="#87ceeb" />
 
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow geometry={terrainGeo} onClick={handleTerrainClick}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow geometry={terrainGeo} onClick={handleTerrainClick} onDoubleClick={handleTerrainDoubleClick}>
         <meshStandardMaterial vertexColors={true} roughness={1} metalness={0.02} bumpMap={noiseTex} bumpScale={0.8} />
       </mesh>
 
             {showPlotLines && <ProceduralPlotLines voronoiData={voronoiData} />}
       {selectedPlot && showPlotLines && <PlotCallout key={selectedPlot.id} plot={selectedPlot} />}
+      {doubleClickedPlot && showPlotLines && <SelectedPlotHighlight plot={doubleClickedPlot} />}
 
       {/* Lake / Water Body at the bottom of the valleys */}
       <WaterAnimator texture={noiseTex} />
@@ -624,6 +927,12 @@ export const OpenPlotsMap: React.FC = () => {
             </EffectComposer>
     </Canvas>
     
+    <AnimatePresence>
+      {doubleClickedPlot && (
+         <PlotDetailsPanel plot={doubleClickedPlot} onClose={() => setDoubleClickedPlot(null)} />
+      )}
+    </AnimatePresence>
+
     <div style={{ position: 'absolute', bottom: '20px', right: '20px', zIndex: 1000 }}>
       <button 
         onClick={() => setShowPlotLines(!showPlotLines)}

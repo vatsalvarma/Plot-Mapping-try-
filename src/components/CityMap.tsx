@@ -248,26 +248,57 @@ export const FlappingBird = ({ startPos, speed, offset }: { startPos: [number, n
   useFrame((state, delta) => {
     if (!ref.current) return;
     ref.current.position.x -= speed * delta;
-    // Slight bobbing
     ref.current.position.y += Math.sin(state.clock.elapsedTime * 2 + offset) * 0.02;
     if (ref.current.position.x < -200) ref.current.position.x = 200;
     
-    // Flapping wings
     const flap = Math.sin(state.clock.elapsedTime * 15 + offset);
-    (ref.current.children[0] as any).rotation.z = flap * 0.6;
-    (ref.current.children[1] as any).rotation.z = -flap * 0.6;
+    const innerWing = flap * 0.6;
+    const outerWing = flap * 0.9;
+    
+    (ref.current.children[3] as any).rotation.z = innerWing;
+    ((ref.current.children[3] as any).children[1] as any).rotation.z = outerWing - innerWing;
+    (ref.current.children[4] as any).rotation.z = -innerWing;
+    ((ref.current.children[4] as any).children[1] as any).rotation.z = -outerWing + innerWing;
   });
   
   return (
-    <group ref={ref} position={startPos}>
-       <mesh position={[0, 0, 0.3]}>
-         <boxGeometry args={[0.6, 0.05, 0.5]} />
-         <meshBasicMaterial color="#111" />
+    <group ref={ref} position={startPos} scale={[1.2, 1.2, 1.2]}>
+       <mesh position={[0, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+         <capsuleGeometry args={[0.1, 0.4, 4, 8]} />
+         <meshStandardMaterial color="#222" roughness={0.8} />
        </mesh>
-       <mesh position={[0, 0, -0.3]}>
-         <boxGeometry args={[0.6, 0.05, 0.5]} />
-         <meshBasicMaterial color="#111" />
+       <mesh position={[-0.3, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+         <coneGeometry args={[0.05, 0.15, 4]} />
+         <meshStandardMaterial color="#ffaa00" roughness={0.4} />
        </mesh>
+       <mesh position={[0.3, 0, 0]} rotation={[0, 0, -Math.PI / 2]}>
+         <coneGeometry args={[0.15, 0.3, 3]} />
+         <meshStandardMaterial color="#111" roughness={0.9} />
+       </mesh>
+       <group position={[0, 0.05, 0.1]}>
+          <mesh position={[0, 0, 0.2]}>
+            <boxGeometry args={[0.4, 0.02, 0.4]} />
+            <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
+          </mesh>
+          <group position={[0, 0, 0.4]}>
+             <mesh position={[-0.1, 0, 0.2]} rotation={[0, 0.2, 0]}>
+               <boxGeometry args={[0.5, 0.01, 0.5]} />
+               <meshStandardMaterial color="#111" roughness={0.9} />
+             </mesh>
+          </group>
+       </group>
+       <group position={[0, 0.05, -0.1]}>
+          <mesh position={[0, 0, -0.2]}>
+            <boxGeometry args={[0.4, 0.02, 0.4]} />
+            <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
+          </mesh>
+          <group position={[0, 0, -0.4]}>
+             <mesh position={[-0.1, 0, -0.2]} rotation={[0, -0.2, 0]}>
+               <boxGeometry args={[0.5, 0.01, 0.5]} />
+               <meshStandardMaterial color="#111" roughness={0.9} />
+             </mesh>
+          </group>
+       </group>
     </group>
   );
 };
