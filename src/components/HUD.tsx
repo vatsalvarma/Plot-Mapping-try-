@@ -1,140 +1,149 @@
-import React from 'react';
-import type { BuildingData, ViewMode } from '../App';
+import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import type { FilterStatus } from '../types';
+import { cn } from '../lib/utils';
+import { Filter, CircleDot, CheckCircle2, Ban, Map } from 'lucide-react';
 
-export const HUD: React.FC<{ 
-  selectedBuilding: BuildingData | null;
-  activeView: ViewMode;
-  setActiveView: (v: ViewMode) => void;
-}> = ({ selectedBuilding, activeView, setActiveView }) => {
+interface HUDProps {
+  activeFilter: FilterStatus;
+  setActiveFilter: (status: FilterStatus) => void;
+}
+
+// Ultra-premium staggered text with color pop
+const PremiumText = ({ text, delay = 0, isActive }: { text: string, delay?: number, isActive: boolean }) => {
   return (
-    <div className="ui-layer">
-      
-      {/* Top Navigation */}
-      <div className="top-nav ui-interactive">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-           {/* Logo Icon */}
-           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-           <span style={{ fontSize: '1.2rem', letterSpacing: '2px', fontWeight: 'bold' }}>SurveilTrack</span>
-        </div>
-        
-        <div className="nav-links">
-          <div className={`nav-link ${activeView === 'PLOT_MODEL' ? 'active' : ''}`} onClick={() => setActiveView('PLOT_MODEL')}>PLOT MODEL</div>
-          <div className={`nav-link ${activeView === 'CITY' ? 'active' : ''}`} onClick={() => setActiveView('CITY')}>UNIT MAP</div>
-          <div className={`nav-link ${activeView === 'PLOTS' ? 'active' : ''}`} onClick={() => setActiveView('PLOTS')}>OPEN PLOTS</div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '2rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-            NEW YORK, USA
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-             2:30AM
-          </span>
-        </div>
-      </div>
-
-      {/* Filter Tabs below Top Nav */}
-      <div style={{ position: 'absolute', top: '70px', left: '50%', transform: 'translateX(-50%)', display: 'flex', border: '1px solid var(--border-light)', background: 'var(--bg-panel)' }} className="ui-interactive">
-         <div style={{ padding: '0.5rem 1rem', borderRight: '1px solid var(--border-light)', color: '#fff' }}>City</div>
-         <div style={{ padding: '0.5rem 1rem', borderRight: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>District</div>
-         <div style={{ padding: '0.5rem 1rem', color: 'var(--text-muted)' }}>Street</div>
-      </div>
-
-      {/* Left Sidebar Icons */}
-      <div style={{ position: 'absolute', left: 0, top: '50px', bottom: '0', width: '60px', borderRight: '1px solid var(--border-light)', background: 'var(--bg-panel)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2rem', paddingTop: '2rem' }} className="ui-interactive">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.5 }}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.5 }}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-      </div>
-
-      {/* Drone Details Card (Only in City Mode) */}
-      {activeView === 'CITY' && (
-        <div className="drone-card ui-interactive">
-          <div className="drone-card-inner">
-           <div className="drone-image-box">
-              {/* Drone Wireframe Icon */}
-              <svg width="120" height="80" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
-                 <path d="M12 4v4M8 6h8M6 8h12M4 10h16M12 10v6M9 16h6M8 18h8M7 20h10M6 10l-2 8M18 10l2 8"/>
-              </svg>
-              <button className="drone-details-btn">Details ↗</button>
-           </div>
-           
-           {!selectedBuilding ? (
-             <div style={{ textAlign: 'center', color: 'var(--text-muted)', margin: '3rem 0', fontStyle: 'italic' }}>
-               Select a building on the 3D map to view live structural and surveillance details.
-             </div>
-           ) : (
-             <>
-               <div className="drone-title">
-                 <div className={`status-dot ${selectedBuilding.signal === 'WEAK' ? 'status-inactive' : 'status-active'}`} />
-                 <span style={{ fontSize: '0.8rem', color: selectedBuilding.signal === 'WEAK' ? 'var(--accent-orange)' : 'var(--accent-green)' }}>ACTIVE</span>
-                 {selectedBuilding.name}
-               </div>
-
-               <div className="stat-row">
-                 <span className="stat-label">Power</span>
-                 <span>{selectedBuilding.power}% {Array.from({length: 10}).map((_, i) => i < selectedBuilding.power / 10 ? '|' : '-').join('')}</span>
-               </div>
-               <div className="stat-row">
-                 <span className="stat-label">Session</span>
-                 <span>{selectedBuilding.session}</span>
-               </div>
-               <div className="stat-row">
-                 <span className="stat-label">Signal</span>
-                 <span style={{ color: selectedBuilding.signal === 'STRONG' ? 'var(--accent-green)' : 'var(--accent-orange)' }}>
-                   {selectedBuilding.signal} <div className="status-dot" style={{ display: 'inline-block', background: selectedBuilding.signal === 'STRONG' ? 'var(--accent-green)' : 'var(--accent-orange)' }}/>
-                 </span>
-               </div>
-
-               <div style={{ display: 'flex', border: '1px solid var(--border-light)', marginTop: '1.5rem' }}>
-                 <div style={{ flex: 1, textAlign: 'center', padding: '0.5rem', background: 'rgba(255,255,255,0.1)' }}>PERFORMANCE</div>
-                 <div style={{ flex: 1, textAlign: 'center', padding: '0.5rem', color: 'var(--text-muted)' }}>HEALTH</div>
-               </div>
-
-               <div className="progress-bar-container">
-                 <div className="progress-bars">
-                    {[...Array(20)].map((_, i) => (
-                      <div key={i} className={`bar-segment ${i < (selectedBuilding.health / 5) ? 'filled' : ''}`} />
-                    ))}
-                    <span style={{ marginLeft: '1rem', fontSize: '1.2rem' }}>{selectedBuilding.health}%</span>
-                 </div>
-                 <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>LIVE STRUCTURAL INTEGRITY DETAILS...</div>
-               </div>
-             </>
-           )}
-        </div>
-      </div>
-      )}
-
-      {/* Bottom Unit List */}
-      <div className="bottom-bar ui-interactive" style={{ left: '60px' }}>
-         <div className="bottom-tabs">
-           <div className="bottom-tab active">Unit List</div>
-           <div className="bottom-tab">Statistics</div>
-           <div className="bottom-tab">Performances</div>
-           <div className="bottom-tab">Overview</div>
-           <div className="bottom-tab">Messages</div>
-         </div>
-         
-         <div className="unit-list">
-           <div className="unit-item" style={{ borderColor: 'rgba(255,255,255,0.5)' }}>
-              <div className="status-dot status-active" /> AEC-4200-NYC <span style={{ marginLeft: 'auto' }}>↗</span>
-           </div>
-           <div className="unit-item">
-              <div className="status-dot status-active" /> BAS-3100-NYC <span style={{ marginLeft: 'auto' }}>↗</span>
-           </div>
-           <div className="unit-item">
-              <div className="status-dot status-inactive" /> ICD-500-NYC <span style={{ marginLeft: 'auto' }}>↗</span>
-           </div>
-           <div className="unit-item">
-              <div className="status-dot" style={{ background: '#666' }} /> MME-9420-NYC <span style={{ marginLeft: 'auto' }}>↗</span>
-           </div>
-         </div>
-      </div>
-
-    </div>
+    <span className="flex">
+      {text.split('').map((char, i) => (
+        <motion.span
+          key={i}
+          initial={{ opacity: 0, filter: 'blur(10px)', y: -20, scale: 0.2, rotateX: 90 }}
+          animate={{ opacity: 1, filter: 'blur(0px)', y: 0, scale: 1, rotateX: 0 }}
+          transition={{ duration: 0.6, delay: delay + (i * 0.04), type: 'spring', bounce: 0.6 }}
+          className={cn("inline-block transition-all duration-500", isActive ? 'text-white' : '')}
+        >
+          {char === ' ' ? '\u00A0' : char}
+        </motion.span>
+      ))}
+    </span>
   );
 };
+
+export function HUD({ activeFilter, setActiveFilter }: HUDProps) {
+  const filters: { id: FilterStatus; label: string; icon: any; color: string; glow: string }[] = [
+    { id: 'NONE', label: 'ALL PLOTS', icon: Map, color: 'text-white', glow: 'rgba(255,255,255,0.7)' },
+    { id: 'ALL', label: 'STATUS', icon: Filter, color: 'text-white', glow: 'rgba(255,255,255,0.7)' },
+    { id: 'AVAILABLE', label: 'AVAILABLE', icon: CheckCircle2, color: 'text-success', glow: 'rgba(74,222,128,0.9)' },
+    { id: 'BOOKED', label: 'BOOKED', icon: CircleDot, color: 'text-warning', glow: 'rgba(250,204,21,0.9)' },
+    { id: 'SOLD', label: 'SOLD', icon: Ban, color: 'text-danger', glow: 'rgba(248,113,113,0.9)' },
+  ];
+
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    }
+  };
+
+  return (
+    <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-40 pointer-events-auto perspective-1000">
+      
+      {/* Extreme Glassmorphic Container with Mouse Spotlight & Gradient Border */}
+      <motion.div 
+        ref={containerRef}
+        onMouseMove={handleMouseMove}
+        initial={{ y: 250, opacity: 0, scale: 0.3, rotateX: 60 }}
+        animate={{ y: [0, -15, 0], opacity: 1, scale: 1, rotateX: [0, 4, 0], rotateY: [0, -3, 0] }}
+        transition={{ 
+          y: { duration: 6, repeat: Infinity, ease: "easeInOut" },
+          rotateX: { duration: 7, repeat: Infinity, ease: "easeInOut" },
+          rotateY: { duration: 8, repeat: Infinity, ease: "easeInOut" },
+          opacity: { duration: 0.8 },
+          scale: { duration: 1.2, type: "spring", bounce: 0.6 }
+        }}
+        className="group relative bg-black/40 backdrop-blur-[60px] rounded-full p-2.5 flex items-center gap-3 overflow-hidden shadow-[0_40px_80px_rgba(0,0,0,0.9)] border border-white/5 transition-colors duration-700"
+      >
+        {/* Animated Rotating Gradient Border */}
+        <div className="absolute inset-0 rounded-full bg-[conic-gradient(from_0deg_at_50%_50%,rgba(255,255,255,0)_0%,rgba(255,255,255,0.4)_50%,rgba(255,255,255,0)_100%)] animate-[spin_4s_linear_infinite] opacity-0 group-hover:opacity-100 transition-opacity duration-700 -z-10 mix-blend-overlay"></div>
+        <div className="absolute inset-[1px] bg-black/40 rounded-full backdrop-blur-xl -z-10"></div>
+        
+        {/* Mouse Tracking Spotlight */}
+        <div 
+          className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-0 mix-blend-overlay"
+          style={{
+            background: `radial-gradient(120px circle at ${mousePos.x}px ${mousePos.y}px, rgba(255,255,255,0.25), transparent 100%)`
+          }}
+        />
+
+        {/* Animated ambient noise texture inside the glass */}
+        <div className="absolute inset-0 bg-noise opacity-[0.1] mix-blend-overlay pointer-events-none rounded-full animate-noise z-0"></div>
+        
+        {filters.map((filter, index) => {
+          const isActive = activeFilter === filter.id;
+          
+          return (
+            <motion.button
+              key={filter.id}
+              initial={{ opacity: 0, scale: 0, x: -50 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              transition={{ delay: 0.3 + index * 0.1, type: "spring", bounce: 0.7 }}
+              whileHover={{ scale: 1.15, y: -6, rotateZ: isActive ? 0 : 3 }}
+              whileTap={{ scale: 0.85 }}
+              onClick={() => setActiveFilter(isActive ? 'NONE' : filter.id)}
+              className={cn(
+                'relative px-5 py-3 rounded-full flex items-center gap-2.5 text-xs font-extrabold tracking-[0.2em] transition-all duration-300 z-10 overflow-hidden',
+                isActive ? filter.color : 'text-white/40 hover:text-white'
+              )}
+            >
+              {/* Ripple Effect Background on Active */}
+              {isActive && (
+                <motion.div
+                  layoutId="activeFilterBg"
+                  className="absolute inset-0 rounded-full bg-white/15 border border-white/30 backdrop-blur-md"
+                  initial={{ opacity: 0 }}
+                  animate={{ 
+                    opacity: 1,
+                    boxShadow: [
+                      `0 0 15px ${filter.glow}, inset 0 0 10px ${filter.glow}`,
+                      `0 0 35px ${filter.glow}, inset 0 0 20px ${filter.glow}`,
+                      `0 0 15px ${filter.glow}, inset 0 0 10px ${filter.glow}`
+                    ]
+                  }}
+                  exit={{ opacity: 0, scale: 0.5 }}
+                  transition={{ 
+                    layout: { type: 'spring', bounce: 0.3, duration: 0.8 },
+                    boxShadow: { duration: 1.5, repeat: Infinity, ease: "easeInOut" }
+                  }}
+                />
+              )}
+              
+              <motion.span 
+                className="relative z-10 flex items-center justify-center mix-blend-plus-lighter"
+                initial={{ rotateY: 180, scale: 0, opacity: 0 }}
+                animate={{ rotateY: 0, scale: 1, opacity: 1 }}
+                transition={{ delay: 0.6 + index * 0.1, type: "spring", bounce: 0.7 }}
+                whileHover={{ rotateY: 180, scale: 1.2, transition: { duration: 0.4 } }}
+              >
+                <filter.icon size={16} className={cn("transition-all duration-500", isActive ? "scale-125 drop-shadow-[0_0_15px_currentColor]" : "group-hover:drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]")} />
+              </motion.span>
+              
+              <span className="relative z-10 flex items-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+                <PremiumText text={filter.label} delay={0.7 + index * 0.1} isActive={isActive} />
+              </span>
+
+              {/* Click Ripple Pseudo Element */}
+              <motion.div
+                initial={{ scale: 0, opacity: 0 }}
+                whileTap={{ scale: 2, opacity: 0.2 }}
+                transition={{ duration: 0.4 }}
+                className="absolute inset-0 bg-white rounded-full mix-blend-overlay pointer-events-none"
+              />
+            </motion.button>
+          );
+        })}
+      </motion.div>
+    </div>
+  );
+}
