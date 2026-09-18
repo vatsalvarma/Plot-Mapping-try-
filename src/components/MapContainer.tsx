@@ -65,7 +65,7 @@ export function MapContainer({ children }: MapContainerProps) {
           initial={{ scale: 1.05 }}
           animate={{ scale: 1 }}
           transition={{ duration: 10, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
-          src="/map-bg.png" 
+          src={`${import.meta.env.BASE_URL}map-bg.png`}
           alt="Map Background" 
           className="absolute inset-0 w-full h-full object-cover pointer-events-none"
         />
