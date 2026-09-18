@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { motion, useMotionValue, useSpring } from 'framer-motion';
 
 export function Cursor() {

@@ -18,7 +18,7 @@ const hudStagger = {
 
 const hudItem = {
   hidden: { opacity: 0, x: -60, scale: 0.8, rotateX: 20 },
-  show: { opacity: 1, x: 0, scale: 1, rotateX: 0, transition: { type: 'spring', damping: 18, stiffness: 200 } },
+  show: { opacity: 1, x: 0, scale: 1, rotateX: 0, transition: { type: 'spring' as const, damping: 18, stiffness: 200 } },
   exit: { opacity: 0, x: -40, scale: 0.9, transition: { duration: 0.3 } }
 };
 

@@ -19,8 +19,8 @@ export function MapContainer({ children }: MapContainerProps) {
 
   // Convert mouse percentage (0-100) to translation percentage (-X% to +X%)
   // We have a 3840px map. Let's make it pan based on mouse position.
-  const x = useTransform(smoothX, [0, window.innerWidth], [0, -1920]); // Max width - viewport width
-  const y = useTransform(smoothY, [0, window.innerHeight], [-100, -300]); // slight vertical pan
+  // const x = useTransform(smoothX, [0, window.innerWidth], [0, -1920]); // Max width - viewport width
+  // const y = useTransform(smoothY, [0, window.innerHeight], [-100, -300]); // slight vertical pan
   
   // Update map bounds when window resizes
   const [bounds, setBounds] = useState({ maxScrollX: 0, maxScrollY: 0 });

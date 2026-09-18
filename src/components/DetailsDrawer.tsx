@@ -20,7 +20,7 @@ const staggerContainer = {
 
 const itemAnim = {
   hidden: { opacity: 0, y: 10, scale: 0.98 },
-  show: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 400, damping: 25 } }
+  show: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring' as const, stiffness: 400, damping: 25 } }
 };
 
 const TypewriterText = ({ text, delay = 0, className = '' }: { text: string, delay?: number, className?: string }) => {
@@ -90,7 +90,7 @@ export function DetailsDrawer({ plot, onClose }: DetailsDrawerProps) {
   const shapePoints = plot ? getNormalizedPoints(plot.points) : [];
   const polygonString = shapePoints.map(p => `${p.nx},${p.ny}`).join(' ');
 
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [, setMousePos] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleMouseMove = (e: React.MouseEvent) => {

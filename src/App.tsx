@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { FilterStatus, PlotData } from './types';
 import { MapContainer } from './components/MapContainer';
 import { PlotOverlay } from './components/PlotOverlay';

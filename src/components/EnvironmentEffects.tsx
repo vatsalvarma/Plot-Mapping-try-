@@ -142,7 +142,7 @@ export const RainSystem = () => {
   return (
     <points>
       <bufferGeometry ref={rainGeo}>
-        <bufferAttribute attach="attributes-position" count={rainCount} array={positions} itemSize={3} />
+        <bufferAttribute attach="attributes-position" count={rainCount} array={positions} itemSize={3} args={[positions, 3]} />
       </bufferGeometry>
       <pointsMaterial color="#aaaaaa" size={0.3} transparent opacity={0.6} />
     </points>

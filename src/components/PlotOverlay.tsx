@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { motion } from 'framer-motion';
 import type { FilterStatus, PlotData } from '../types';
 import { cn } from '../lib/utils';
