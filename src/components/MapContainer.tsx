@@ -61,10 +61,7 @@ export function MapContainer({ children }: MapContainerProps) {
         style={{ x: xPan, y: yPan }}
         className="absolute top-0 left-0 w-[3840px] h-[1080px]"
       >
-        <motion.img 
-          initial={{ scale: 1.05 }}
-          animate={{ scale: 1 }}
-          transition={{ duration: 10, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
+        <img 
           src={`${import.meta.env.BASE_URL}map-bg.png`}
           alt="Map Background" 
           className="absolute inset-0 w-full h-full object-cover pointer-events-none"
