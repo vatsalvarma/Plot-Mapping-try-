@@ -1,10 +1,9 @@
-
 import { motion } from 'framer-motion';
-import type { FilterStatus, PlotData } from '../types';
+import type { FilterStatus, PlotData, PlotMap } from '../types';
 import { cn } from '../lib/utils';
-import { PLOTS } from '../data/plots';
 
 interface PlotOverlayProps {
+  currentMap: PlotMap;
   activeFilter: FilterStatus;
   selectedPlot: PlotData | null;
   onPlotClick: (plot: PlotData) => void;
@@ -12,51 +11,58 @@ interface PlotOverlayProps {
 }
 
 const statusColors = {
-  AVAILABLE: 'fill-success/40 stroke-success hover:fill-success/60',
-  BOOKED: 'fill-warning/40 stroke-warning hover:fill-warning/60',
-  SOLD: 'fill-danger/40 stroke-danger hover:fill-danger/60',
+  AVAILABLE: 'fill-success/35 stroke-success hover:fill-success/55',
+  BOOKED: 'fill-warning/35 stroke-warning hover:fill-warning/55',
+  SOLD: 'fill-danger/35 stroke-danger hover:fill-danger/55',
 };
 
-export function PlotOverlay({ activeFilter, selectedPlot, onPlotClick, onPlotHover }: PlotOverlayProps) {
+export function PlotOverlay({ currentMap, activeFilter, selectedPlot, onPlotClick, onPlotHover }: PlotOverlayProps) {
   return (
-    <div className="absolute inset-0 pointer-events-none z-10 w-[3840px] h-[1080px]">
+    <div className="absolute inset-0 pointer-events-none z-10 w-full h-full">
       <svg 
-        viewBox="0 0 3840 1080" 
+        viewBox={`0 0 ${currentMap.width} ${currentMap.height}`}
         className="w-full h-full pointer-events-auto"
-        preserveAspectRatio="xMidYMid slice"
+        preserveAspectRatio={currentMap.enableMousePan ? "xMidYMid slice" : "none"}
       >
-        {PLOTS.map((plot) => {
+        {currentMap.plots.map((plot) => {
           const isSelected = selectedPlot?.id === plot.id;
           const isVisible = activeFilter === 'NONE' || activeFilter === 'ALL' || activeFilter === plot.status;
           
           if (!isVisible) return null;
 
           const colorClass = activeFilter === 'NONE' 
-            ? 'stroke-white fill-white/5' 
+            ? 'stroke-white fill-white/10 hover:fill-white/30' 
             : statusColors[plot.status];
 
           return (
-            <g key={plot.id} className="group transition-all duration-300">
+            <g key={plot.id} className="group transition-all duration-300 cursor-pointer">
               <motion.polygon
                 onClick={() => onPlotClick(plot)}
                 onPointerEnter={() => onPlotHover?.(plot)}
                 onPointerLeave={() => onPlotHover?.(null)}
                 points={plot.points}
-                whileHover={{ filter: 'drop-shadow(0 0 20px rgba(255,255,255,0.8))' }}
+                whileHover={{ 
+                  filter: 'drop-shadow(0 0 15px rgba(255,255,255,0.9))',
+                  strokeWidth: 2.5
+                }}
                 animate={isSelected ? { 
-                  strokeWidth: [4, 7, 4], 
-                  opacity: [1, 0.7, 1], 
-                  filter: ['drop-shadow(0 0 20px rgba(255,255,255,0.7))', 'drop-shadow(0 0 35px rgba(255,255,255,1))', 'drop-shadow(0 0 20px rgba(255,255,255,0.7))'] 
+                  strokeWidth: [2.5, 4.5, 2.5], 
+                  opacity: [1, 0.8, 1], 
+                  filter: [
+                    'drop-shadow(0 0 15px rgba(255,255,255,0.8))', 
+                    'drop-shadow(0 0 30px rgba(255,255,255,1))', 
+                    'drop-shadow(0 0 15px rgba(255,255,255,0.8))'
+                  ] 
                 } : {
-                  strokeWidth: 3,
+                  strokeWidth: 2,
                   opacity: 1,
                   filter: 'drop-shadow(0 0 0px rgba(0,0,0,0))'
                 }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
                 className={cn(
-                  'transition-all duration-500 hover:!fill-white/40',
+                  'transition-all duration-300',
                   colorClass,
-                  isSelected ? 'stroke-white' : ''
+                  isSelected ? 'stroke-white !fill-white/30' : ''
                 )}
                 style={{
                   transformOrigin: `${plot.center.x}px ${plot.center.y}px`,
@@ -67,9 +73,7 @@ export function PlotOverlay({ activeFilter, selectedPlot, onPlotClick, onPlotHov
                 y={plot.center.y}
                 textAnchor="middle"
                 dominantBaseline="middle"
-                initial={{ opacity: 0, scale: 0.5, y: 10 }}
-                whileInView={{ opacity: 0, scale: 0.5, y: 10 }} 
-                className="fill-white font-display font-bold text-2xl opacity-0 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 drop-shadow-[0_0_15px_rgba(255,255,255,0.8)] pointer-events-none"
+                className="fill-white font-display font-extrabold text-xl opacity-0 group-hover:opacity-100 group-hover:scale-110 transition-all duration-300 drop-shadow-[0_0_12px_rgba(255,255,255,0.9)] pointer-events-none select-none"
               >
                 {plot.number}
               </motion.text>

@@ -17,3 +17,16 @@ export interface PlotData {
 }
 
 export type FilterStatus = 'NONE' | 'ALL' | PlotStatus;
+
+export interface PlotMap {
+  id: string;
+  name: string;
+  subtitle: string;
+  badge: string;
+  image: string;
+  thumbnail: string;
+  width: number;
+  height: number;
+  enableMousePan: boolean;
+  plots: PlotData[];
+}

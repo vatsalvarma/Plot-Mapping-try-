@@ -1,15 +1,17 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import type { PlotMap } from '../types';
 
 interface MapContainerProps {
+  currentMap: PlotMap;
   children: React.ReactNode;
 }
 
-export function MapContainer({ children }: MapContainerProps) {
+export function MapContainer({ currentMap, children }: MapContainerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<HTMLDivElement>(null);
   
-  // Motion values for smooth panning
+  // Motion values for smooth panning (used only when enableMousePan is true)
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
 
@@ -17,58 +19,74 @@ export function MapContainer({ children }: MapContainerProps) {
   const smoothX = useSpring(mouseX, { stiffness: 50, damping: 20 });
   const smoothY = useSpring(mouseY, { stiffness: 50, damping: 20 });
 
-  // Convert mouse percentage (0-100) to translation percentage (-X% to +X%)
-  // We have a 3840px map. Let's make it pan based on mouse position.
-  // const x = useTransform(smoothX, [0, window.innerWidth], [0, -1920]); // Max width - viewport width
-  // const y = useTransform(smoothY, [0, window.innerHeight], [-100, -300]); // slight vertical pan
-  
   // Update map bounds when window resizes
   const [bounds, setBounds] = useState({ maxScrollX: 0, maxScrollY: 0 });
 
   useEffect(() => {
     const updateBounds = () => {
-      if (mapRef.current) {
+      if (mapRef.current && currentMap.enableMousePan) {
         setBounds({
           maxScrollX: mapRef.current.clientWidth - window.innerWidth,
           maxScrollY: mapRef.current.clientHeight - window.innerHeight,
         });
+      } else {
+        setBounds({ maxScrollX: 0, maxScrollY: 0 });
       }
     };
     updateBounds();
     window.addEventListener('resize', updateBounds);
     return () => window.removeEventListener('resize', updateBounds);
-  }, []);
+  }, [currentMap]);
 
-  const xPan = useTransform(smoothX, [0, window.innerWidth], [0, -Math.max(0, bounds.maxScrollX)]);
-  const yPan = useTransform(smoothY, [0, window.innerHeight], [0, -Math.max(0, bounds.maxScrollY)]);
+  const xPan = useTransform(smoothX, [0, typeof window !== 'undefined' ? window.innerWidth : 1920], [0, -Math.max(0, bounds.maxScrollX)]);
+  const yPan = useTransform(smoothY, [0, typeof window !== 'undefined' ? window.innerHeight : 1080], [0, -Math.max(0, bounds.maxScrollY)]);
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    mouseX.set(e.clientX);
-    mouseY.set(e.clientY);
+    if (currentMap.enableMousePan) {
+      mouseX.set(e.clientX);
+      mouseY.set(e.clientY);
+    }
   };
 
   return (
     <motion.div 
-      initial={{ scale: 1.1, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ duration: 2, ease: [0.16, 1, 0.3, 1] }}
+      key={currentMap.id}
+      initial={{ opacity: 0, scale: 0.99 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
       ref={containerRef}
-      className="relative w-screen h-screen overflow-hidden bg-[#090909] active:cursor-grabbing"
+      className="relative w-screen h-screen overflow-hidden bg-[#090909] select-none"
       onMouseMove={handleMouseMove}
     >
-      <motion.div
-        ref={mapRef}
-        style={{ x: xPan, y: yPan }}
-        className="absolute top-0 left-0 w-[3840px] h-[1080px]"
-      >
-        <img 
-          src={`${import.meta.env.BASE_URL}map-bg.png`}
-          alt="Map Background" 
-          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-        />
-        <div className="absolute inset-0 bg-black/30 pointer-events-none" /> {/* Luxury darkening overlay */}
-        {children}
-      </motion.div>
+      {currentMap.enableMousePan ? (
+        /* Panoramic Panning Layout */
+        <motion.div
+          ref={mapRef}
+          style={{ x: xPan, y: yPan }}
+          className="absolute top-0 left-0 w-[3840px] h-[1080px]"
+        >
+          <img 
+            src={`${import.meta.env.BASE_URL}${currentMap.image}`}
+            alt={currentMap.name} 
+            className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
+          />
+          <div className="absolute inset-0 bg-black/20 pointer-events-none" />
+          {children}
+        </motion.div>
+      ) : (
+        /* Fullscreen Static Layout - No Mouse Movement */
+        <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+          <div className="relative w-full h-full">
+            <img 
+              src={`${import.meta.env.BASE_URL}${currentMap.image}`}
+              alt={currentMap.name} 
+              className="w-full h-full object-fill pointer-events-none select-none"
+            />
+            <div className="absolute inset-0 bg-black/10 pointer-events-none" />
+            {children}
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }
