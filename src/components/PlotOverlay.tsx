@@ -35,8 +35,9 @@ export function PlotOverlay({ currentMap, activeFilter, selectedPlot, onPlotClic
             : statusColors[plot.status];
 
           return (
-            <g key={plot.id} className="group transition-all duration-300 cursor-pointer">
+            <g key={`${plot.id}-${plot.points}`} className="group transition-all duration-300 cursor-pointer">
               <motion.polygon
+                key={plot.points}
                 onClick={() => onPlotClick(plot)}
                 onPointerEnter={() => onPlotHover?.(plot)}
                 onPointerLeave={() => onPlotHover?.(null)}

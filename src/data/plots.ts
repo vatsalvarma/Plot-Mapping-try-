@@ -68,7 +68,7 @@ export const PLOTS_PALM_MEADOWS: PlotData[] = [
     id: 'palm-201',
     number: 201,
     status: 'AVAILABLE',
-    points: '586,706 878,514 1115,608 850,885',
+    points: '606,736 878,514 1115,608 820,885',
     area: '6,500 sq.ft',
     price: '$320,000',
     dimensions: { n: '110ft', s: '120ft', e: '100ft', w: '95ft' },

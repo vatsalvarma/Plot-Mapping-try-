@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FilterStatus, PlotData, PlotMap } from './types';
-import { MAP_PALM_MEADOWS } from './data/plots';
+import { ALL_MAPS } from './data/plots';
 import { MapContainer } from './components/MapContainer';
 import { PlotOverlay } from './components/PlotOverlay';
 import { HUD } from './components/HUD';
@@ -10,23 +10,28 @@ import { Logo } from './components/Logo';
 import { PlotSwitcher } from './components/PlotSwitcher';
 
 function App() {
-  const [currentMap, setCurrentMap] = useState<PlotMap>(MAP_PALM_MEADOWS);
+  const [currentMapId, setCurrentMapId] = useState<string>('palm-meadows');
   const [activeFilter, setActiveFilter] = useState<FilterStatus>('NONE');
-  const [selectedPlot, setSelectedPlot] = useState<PlotData | null>(null);
-  const [hoveredPlot, setHoveredPlot] = useState<PlotData | null>(null);
+  const [selectedPlotId, setSelectedPlotId] = useState<string | null>(null);
+  const [hoveredPlotId, setHoveredPlotId] = useState<string | null>(null);
+
+  // Dynamically resolve current map so any code edit in plots.ts updates instantly via HMR without refresh!
+  const currentMap = ALL_MAPS.find((m) => m.id === currentMapId) || ALL_MAPS[0];
+  const selectedPlot = currentMap.plots.find((p) => p.id === selectedPlotId) || null;
+  const hoveredPlot = currentMap.plots.find((p) => p.id === hoveredPlotId) || null;
 
   const handlePlotClick = (plot: PlotData) => {
-    setSelectedPlot(plot);
+    setSelectedPlotId(plot.id);
   };
 
   const handleCloseDrawer = () => {
-    setSelectedPlot(null);
+    setSelectedPlotId(null);
   };
 
   const handleSelectMap = (map: PlotMap) => {
-    setCurrentMap(map);
-    setSelectedPlot(null);
-    setHoveredPlot(null);
+    setCurrentMapId(map.id);
+    setSelectedPlotId(null);
+    setHoveredPlotId(null);
   };
 
   return (
@@ -46,7 +51,7 @@ function App() {
           activeFilter={activeFilter}
           selectedPlot={selectedPlot}
           onPlotClick={handlePlotClick}
-          onPlotHover={setHoveredPlot}
+          onPlotHover={(plot) => setHoveredPlotId(plot ? plot.id : null)}
         />
       </MapContainer>
 
