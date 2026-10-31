@@ -17,6 +17,11 @@ const statusColors = {
 };
 
 export function PlotOverlay({ currentMap, activeFilter, selectedPlot, onPlotClick, onPlotHover }: PlotOverlayProps) {
+  const isSunsetValley = currentMap.id === 'sunset-valley';
+  const defaultStrokeWidth = isSunsetValley ? 0.01 : 2;
+  const hoverStrokeWidth = isSunsetValley ? 1.4 : 2.5;
+  const selectedStrokeWidth = isSunsetValley ? [1.2, 2.2, 1.2] : [2.5, 4.5, 2.5];
+
   return (
     <div className="absolute inset-0 pointer-events-none z-10 w-full h-full">
       <svg 
@@ -43,11 +48,13 @@ export function PlotOverlay({ currentMap, activeFilter, selectedPlot, onPlotClic
                 onPointerLeave={() => onPlotHover?.(null)}
                 points={plot.points}
                 whileHover={{ 
-                  filter: 'drop-shadow(0 0 15px rgba(255,255,255,0.9))',
-                  strokeWidth: 2.5
+                  filter: isSunsetValley
+                    ? 'drop-shadow(0 0 8px rgba(255,255,255,0.8))'
+                    : 'drop-shadow(0 0 15px rgba(255,255,255,0.9))',
+                  strokeWidth: hoverStrokeWidth
                 }}
                 animate={isSelected ? { 
-                  strokeWidth: [2.5, 4.5, 2.5], 
+                  strokeWidth: selectedStrokeWidth, 
                   opacity: [1, 0.8, 1], 
                   filter: [
                     'drop-shadow(0 0 15px rgba(255,255,255,0.8))', 
@@ -55,7 +62,7 @@ export function PlotOverlay({ currentMap, activeFilter, selectedPlot, onPlotClic
                     'drop-shadow(0 0 15px rgba(255,255,255,0.8))'
                   ] 
                 } : {
-                  strokeWidth: 2,
+                  strokeWidth: defaultStrokeWidth,
                   opacity: 1,
                   filter: 'drop-shadow(0 0 0px rgba(0,0,0,0))'
                 }}
